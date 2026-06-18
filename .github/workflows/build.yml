@@ -13,7 +13,7 @@ jobs:
     - name: Set up Build Environment
       run: |
         sudo apt-get update
-        sudo apt-get install -y bc build-essential libelf-dev libssl-dev flex bison ccache libncurses-dev texinfo imagex-utils zip
+        sudo apt-get install -y bc build-essential libelf-dev libssl-dev flex bison ccache libncurses-dev texinfo zip
         mkdir -p $GITHUB_WORKSPACE/kernel
 
     - name: Download Toolchain (Clang)
