@@ -1,4 +1,4 @@
-name: Build Redmi K40 Pro SukiSU Kernel
+name: Super Pure Build K40P SukiSU Kernel
 
 on:
   workflow_dispatch:
@@ -30,11 +30,11 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/kernel
         
-        # 1. 物理移除高通惹祸的网络硬件加速模块源码，彻底杜绝 rmnet 报错
+        # 1. 物理移除高通惹祸的网络源码
         rm -rf techpack/datarmnet
         rm -rf techpack/datarmnet-ext
         
-        # 2. 彻底清理旧目录，纯净注入 SukiSU-Ultra
+        # 2. 注入 SukiSU-Ultra
         rm -rf drivers/kernelsu
         git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git drivers/kernelsu
         
@@ -42,17 +42,17 @@ jobs:
         sed -i '/kernelsu/d' drivers/Makefile
         echo "obj-y += kernelsu/" >> drivers/Makefile
         
-        # 3. 自动寻找红米 K40 Pro (haydn) 的配置文件并复制到正门口
+        # 3. 复制配置文件到正门口
         REAL_DEFCONFIG=$(find arch/arm64/configs/ -name "*haydn*" | head -n 1)
         if [ -z "$REAL_DEFCONFIG" ]; then
           REAL_DEFCONFIG=$(find vendor/ -name "*haydn*" | head -n 1)
         fi
         cp $REAL_DEFCONFIG arch/arm64/configs/haydn_defconfig
         
-        # 【重点】你专属的霸气内核名字！
+        # 【名字修改】注入你尊贵的专属名字！
         sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-SUkiSU-Ultra-K40Pro-By-🐾白墨🐾Whiteink🐾"/g' arch/arm64/configs/haydn_defconfig
         
-        # 4. 强行往配置文件注入配置项
+        # 4. 强行注入配置项
         echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/haydn_defconfig
         echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/haydn_defconfig
 
@@ -65,11 +65,11 @@ jobs:
         export ARCH=arm64
         export SUBARCH=arm64
         
-        # 【核心修正】彻底拿掉报错的 clean 命令，直接生成图纸开工！
+        # 【核心修正】强制不读取任何旧图纸，全自动跳过所有询问弹窗
         make haydn_defconfig
         
-        # 现代化 LLVM 原地混编
-        make -j$(nproc --all) \
+        # 现代化 LLVM 原地混编 (加入 ARCH=arm64 强制静默编译)
+        make -j$(nproc --all) ARCH=arm64 \
           CC=clang \
           CLANG_TRIPLE=aarch64-linux-gnu- \
           CROSS_COMPILE=aarch64-linux-gnu- \
