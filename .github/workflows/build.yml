@@ -36,13 +36,23 @@ jobs:
         git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git drivers/kernelsu
         echo "obj-y += kernelsu/" >> drivers/Makefile
         
-        # 2. 自定义你的内核名字！
-        # 老师帮你写好了，你可以把里面的 "-Suki-Ultra-MyK40Pro" 改成任意你喜欢的英文名字
-        sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="SUkiSU-Ultra-K40Pro-By-Whiteink"/g' arch/arm64/configs/haydn_user_defconfig
+        # 2. 自动寻找红米 K40 Pro (haydn) 的配置文件并改名
+        DEFCONFIG_FILE=$(find arch/arm64/configs/ -name "*haydn*" | head -n 1)
+        if [ -z "$DEFCONFIG_FILE" ]; then
+          DEFCONFIG_FILE=$(find vendor/ -name "*haydn*" | head -n 1)
+        fi
         
-        # 3. 开启 SukiSU 必须的内核配置项
-        echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/haydn_user_defconfig
-        echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/haydn_user_defconfig
+        echo "找到的配置文件路径是: $DEFCONFIG_FILE"
+        
+        # 【重点】这里已经换上了你专属的霸气内核名字！
+        sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-SUkiSU-Ultra-K40Pro-By-🐾白墨🐾Whiteink🐾"/g' $DEFCONFIG_FILE
+        
+        # 3. 注入 SukiSU 必须的内核配置项
+        echo "CONFIG_KALLSYMS=y" >> $DEFCONFIG_FILE
+        echo "CONFIG_KALLSYMS_ALL=y" >> $DEFCONFIG_FILE
+        
+        # 把找到的文件名存起来给下一步用
+        echo "DEFCONFIG_NAME=$(basename $DEFCONFIG_FILE)" >> $GITHUB_ENV
 
     - name: Start Compilation
       run: |
@@ -53,8 +63,8 @@ jobs:
         export CROSS_COMPILE=aarch64-linux-gnu-
         export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
         
-        # 开始编译
-        make O=out haydn_user_defconfig
+        # 开始编译，自动使用上一步找到的配置文件名
+        make O=out $DEFCONFIG_NAME
         make -j$(nproc --all) O=out CC=clang
 
     - name: Pack with AnyKernel3
@@ -63,7 +73,7 @@ jobs:
         git clone https://github.com/osm0sis/AnyKernel3.git AnyKernel3
         # 适配 K40Pro 的代号 haydn
         sed -i 's/device.name1=.*/device.name1=haydn/g' AnyKernel3/anykernel.sh
-        # 老师帮你把编译好的 Image 复制并重命名放到打包目录中
+        # 把编译好的 Image 复制并重命名放到打包目录中
         cp kernel/out/arch/arm64/boot/Image AnyKernel3/
         cd AnyKernel3
         zip -r9 ../SukiSU-Kernel-K40P.zip *
