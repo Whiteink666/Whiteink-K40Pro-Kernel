@@ -16,13 +16,11 @@ jobs:
         sudo apt-get install -y bc build-essential libelf-dev libssl-dev flex bison ccache libncurses-dev texinfo zip lld llvm
         mkdir -p $GITHUB_WORKSPACE/kernel
 
-    - name: Download Google Official Clang (AOSP)
+    - name: Download Google Official Clang (From Github Mirror)
       run: |
         cd $GITHUB_WORKSPACE
-        # 下载 Google 官方为 Android 12/13 内核准备的预编译 Clang-r450784d
-        wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r450784d.tar.gz
-        mkdir -p clang
-        tar -xzf clang-r450784d.tar.gz -C clang
+        # 换用社区维护的 AOSP Clang 镜像仓库，速度极快且极其稳定，版本号对应 r450784d
+        git clone https://github.com/Ygjsz/google-clang.git --depth=1 -b clang-r450784d clang
         
         # 下载官方交叉编译器组件 (GCC/Binutils)
         git clone https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 --depth=1 -b master gcc64
@@ -50,7 +48,7 @@ jobs:
         
         echo "找到的配置文件路径是: $DEFCONFIG_FILE"
         
-        # 【重点】这里已经换上了你专属的霸气内核名字！
+        # 【重点】你专属的霸气内核名字
         sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-SUkiSU-Ultra-K40Pro-By-🐾白墨🐾Whiteink🐾"/g' $DEFCONFIG_FILE
         
         # 3. 注入 SukiSU 必须的内核配置项
@@ -64,7 +62,7 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/kernel
         
-        # 设置官方最严谨的路径和交叉编译环境变量
+        # 设置路径和交叉编译环境变量
         export PATH="$GITHUB_WORKSPACE/clang/bin:$GITHUB_WORKSPACE/gcc64/bin:$GITHUB_WORKSPACE/gcc32/bin:$PATH"
         export ARCH=arm64
         export SUBARCH=arm64
@@ -72,7 +70,7 @@ jobs:
         # 预配置内核
         make O=out $DEFCONFIG_NAME
         
-        # 终极官方编译命令组合，彻底告别老旧链接器冲突
+        # 官方内核编译命令组合
         make -j$(nproc --all) O=out \
           CC=clang \
           CLANG_TRIPLE=aarch64-linux-gnu- \
