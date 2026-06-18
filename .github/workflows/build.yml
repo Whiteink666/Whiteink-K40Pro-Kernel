@@ -16,6 +16,7 @@ jobs:
         sudo apt-get install -y bc build-essential libelf-dev libssl-dev flex bison ccache libncurses-dev texinfo zip lld llvm
         mkdir -p $GITHUB_WORKSPACE/kernel
         mkdir -p $GITHUB_WORKSPACE/tmp
+        mkdir -p $GITHUB_WORKSPACE/pack
 
     - name: Download Reliable Lightweight Clang
       run: |
@@ -29,11 +30,9 @@ jobs:
 
     - name: Integrate SukiSU-Ultra & Customize Name
       run: |
-        # 1. 在独立临时目录下载 SukiSU-Ultra
         cd $GITHUB_WORKSPACE/tmp
         git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git kernelsu_source
         
-        # 2. 精准提取驱动核心
         cd $GITHUB_WORKSPACE/kernel
         rm -rf drivers/kernelsu
         if [ -d "$GITHUB_WORKSPACE/tmp/kernelsu_source/kernel" ]; then
@@ -45,25 +44,20 @@ jobs:
         fi
         rm -rf drivers/kernelsu/.git
         
-        # 3. 物理移除高通惹祸的网络硬件加速模块源码
         rm -rf techpack/datarmnet
         rm -rf techpack/datarmnet-ext
         
-        # 4. 安全改写底层编译树
         sed -i '/kernelsu/d' drivers/Makefile
         echo "obj-y += kernelsu/" >> drivers/Makefile
         
-        # 5. 自动寻找红米 K40 Pro (haydn) 的配置文件并复制到正门口
         REAL_DEFCONFIG=$(find arch/arm64/configs/ -name "*haydn*" | head -n 1)
         if [ -z "$REAL_DEFCONFIG" ]; then
           REAL_DEFCONFIG=$(find vendor/ -name "*haydn*" | head -n 1)
         fi
         cp $REAL_DEFCONFIG arch/arm64/configs/haydn_defconfig
         
-        # 【名字修改】使用最安全稳定的纯净英文后缀
-        sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-SukiSU-Ultra"/g' arch/arm64/configs/haydn_defconfig
-        
-        # 6. 强行往配置文件注入配置项
+        # 【专属名字注入】内核层面的专属尾巴！
+        sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-SUkiSU-Ultra-K40Pro-By-Whiteink"/g' arch/arm64/configs/haydn_defconfig
         echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/haydn_defconfig
         echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/haydn_defconfig
 
@@ -89,31 +83,24 @@ jobs:
           OBJDUMP=llvm-objdump \
           STRIP=llvm-strip
 
-    - name: Pack with AnyKernel3
+    - name: Download and Use AGNi Framework
       run: |
-        cd $GITHUB_WORKSPACE
-        rm -rf AnyKernel3
-        git clone https://github.com/osm0sis/AnyKernel3.git AnyKernel3
+        cd $GITHUB_WORKSPACE/pack
+        # 下载适配 K40 Pro 的标准框架
+        git clone https://github.com/Krypton-Project/AnyKernel3.git -b haydn --depth=1 framework
         
-        # 【真正的绝杀修复：精准抹除顽固老路径，强行注入现代 by-name 匹配】
-        # 1. 彻底干掉原文件里所有尝试写死 block=... 的逻辑，直接用我们的现代路径覆盖
-        sed -i 's|^block=.*|block=/dev/block/by-name/boot;|g' $GITHUB_WORKSPACE/AnyKernel3/anykernel.sh
+        # 将我们编译出来的 Image 镜像无缝替换进去
+        cp $GITHUB_WORKSPACE/kernel/arch/arm64/boot/Image $GITHUB_WORKSPACE/pack/framework/Image
         
-        # 2. 强行开启 A/B 槽位支持，适配 K40P 的现代分区机制
-        sed -i 's/is_slot_device=.*/is_slot_device=1;/g' $GITHUB_WORKSPACE/AnyKernel3/anykernel.sh
+        # 【终极修正】强行把人家的打包脚本里的展示名字，改成你专属的霸气名字！
+        sed -i 's/kernel.string=.*/kernel.string=SukiSU-Ultra Kernel By Whiteink/g' $GITHUB_WORKSPACE/pack/framework/anykernel.sh
         
-        # 3. 强行把默认的通用设备名修改为 K40P 的专属代号 haydn
-        sed -i 's/device.name1=.*/device.name1=haydn/g' $GITHUB_WORKSPACE/AnyKernel3/anykernel.sh
-        
-        # 将生成的 Image 镜像精准拷贝到打包目录中
-        cp $GITHUB_WORKSPACE/kernel/arch/arm64/boot/Image* $GITHUB_WORKSPACE/AnyKernel3/
-        
-        # 在 AnyKernel3 目录内生成压缩包
-        cd $GITHUB_WORKSPACE/AnyKernel3
+        # 重新打包
+        cd $GITHUB_WORKSPACE/pack/framework
         zip -r9 SukiSU-Kernel-K40P.zip ./*
 
     - name: Upload Kernel Zip
       uses: actions/upload-artifact@v4
       with:
         name: SukiSU-Ultra-Kernel-RedmiK40Pro
-        path: AnyKernel3/SukiSU-Kernel-K40P.zip
+        path: pack/framework/SukiSU-Kernel-K40P.zip
