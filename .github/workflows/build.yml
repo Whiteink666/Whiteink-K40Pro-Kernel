@@ -13,7 +13,7 @@ jobs:
     - name: Set up Build Environment
       run: |
         sudo apt-get update
-        sudo apt-get install -y bc build-essential libelf-dev libssl-dev flex bison ccache libncurses-dev texinfo zip lld llvm
+        sudo apt-get install -y bc build-essential libelf-dev libssl-dev flex bison ccache libncurses-dev texinfo zip lld llvm rsync
         mkdir -p $GITHUB_WORKSPACE/kernel
         mkdir -p $GITHUB_WORKSPACE/tmp
 
@@ -33,11 +33,11 @@ jobs:
         cd $GITHUB_WORKSPACE/tmp
         git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git kernelsu_source
         
-        # 2. 完整复制保留源码完整性，再精准擦除 Git 套娃痕迹
+        # 2. 精准创建物理目录，只同步纯代码，彻底绝杀 Git 仓库嵌套指纹
         cd $GITHUB_WORKSPACE/kernel
         rm -rf drivers/kernelsu
-        cp -r $GITHUB_WORKSPACE/tmp/kernelsu_source drivers/kernelsu
-        rm -rf drivers/kernelsu/.git
+        mkdir -p drivers/kernelsu
+        rsync -av --exclude='.git' $GITHUB_WORKSPACE/tmp/kernelsu_source/ drivers/kernelsu/
         
         # 3. 物理移除高通惹祸的网络硬件加速模块源码，彻底杜绝 rmnet 报错
         rm -rf techpack/datarmnet
@@ -54,7 +54,7 @@ jobs:
         fi
         cp $REAL_DEFCONFIG arch/arm64/configs/haydn_defconfig
         
-        # 【配置纯净化修改】使用最标准、绝对不触发语法截断的内核后缀名
+        # 【配置纯净化】使用最标准、绝对不触发语法截断的英文内核后缀名
         sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-SukiSU-Ultra"/g' arch/arm64/configs/haydn_defconfig
         
         # 6. 强行往配置文件注入配置项
@@ -70,11 +70,12 @@ jobs:
         export ARCH=arm64
         export SUBARCH=arm64
         
-        # 强制生成纯净图纸
-        yes "" | make haydn_defconfig
+        # 【终极核心修复】不用 yes 轰炸！先生成基础配置，再用 olddefconfig 自动静默同意所有新选项，彻底绝杀 Broken pipe！
+        make haydn_defconfig
+        make olddefconfig
         
-        # 现代化 LLVM 原地混编，无视所有暗雷
-        yes "" | make -j$(nproc --all) \
+        # 现代化 LLVM 原地混编，无缝合流
+        make -j$(nproc --all) \
           CC=clang \
           CLANG_TRIPLE=aarch64-linux-gnu- \
           CROSS_COMPILE=aarch64-linux-gnu- \
@@ -89,17 +90,16 @@ jobs:
     - name: Pack with AnyKernel3
       run: |
         cd $GITHUB_WORKSPACE
-        # 彻底清理旧打包目录，重新克隆
         rm -rf AnyKernel3
         git clone https://github.com/osm0sis/AnyKernel3.git AnyKernel3
         
-        # 使用绝对路径精准适配 K40Pro 的代号 haydn
+        # 使用绝对路径强行适配 K40Pro 的代号 haydn
         sed -i 's/device.name1=.*/device.name1=haydn/g' $GITHUB_WORKSPACE/AnyKernel3/anykernel.sh
         
         # 将生成的 Image 镜像精准拷贝到打包目录中
         cp $GITHUB_WORKSPACE/kernel/arch/arm64/boot/Image* $GITHUB_WORKSPACE/AnyKernel3/
         
-        # 在 AnyKernel3 目录内生成压缩包，不进行跨目录位移，保证绝对安全
+        # 同级目录安全打包
         cd $GITHUB_WORKSPACE/AnyKernel3
         zip -r9 SukiSU-Kernel-K40P.zip ./*
 
