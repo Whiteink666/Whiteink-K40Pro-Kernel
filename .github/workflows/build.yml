@@ -13,7 +13,7 @@ jobs:
     - name: Set up Build Environment
       run: |
         sudo apt-get update
-        sudo apt-get install -y bc build-essential libelf-dev libssl-dev flex bison ccache libncurses-dev texinfo zip lld llvm rsync
+        sudo apt-get install -y bc build-essential libelf-dev libssl-dev flex bison ccache libncurses-dev texinfo zip lld llvm
         mkdir -p $GITHUB_WORKSPACE/kernel
         mkdir -p $GITHUB_WORKSPACE/tmp
 
@@ -29,15 +29,15 @@ jobs:
 
     - name: Integrate SukiSU-Ultra & Customize Name
       run: |
-        # 1. 在独立临时目录下载 SukiSU-Ultra
+        # 1. 在独立临时目录下载 SukiSU-Ultra，避开 Git 嵌套死穴
         cd $GITHUB_WORKSPACE/tmp
         git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git kernelsu_source
         
-        # 2. 精准创建物理目录，只同步纯代码，彻底绝杀 Git 仓库嵌套指纹
+        # 2. 先完整复制保留源码完整性，再精准擦除 Git 套娃指纹痕迹
         cd $GITHUB_WORKSPACE/kernel
         rm -rf drivers/kernelsu
-        mkdir -p drivers/kernelsu
-        rsync -av --exclude='.git' $GITHUB_WORKSPACE/tmp/kernelsu_source/ drivers/kernelsu/
+        cp -r $GITHUB_WORKSPACE/tmp/kernelsu_source drivers/kernelsu
+        rm -rf drivers/kernelsu/.git
         
         # 3. 物理移除高通惹祸的网络硬件加速模块源码，彻底杜绝 rmnet 报错
         rm -rf techpack/datarmnet
@@ -54,7 +54,7 @@ jobs:
         fi
         cp $REAL_DEFCONFIG arch/arm64/configs/haydn_defconfig
         
-        # 【配置纯净化】使用最标准、绝对不触发语法截断的英文内核后缀名
+        # 【配置纯净化修改】使用最标准、绝对不触发语法截断的内核后缀名
         sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-SukiSU-Ultra"/g' arch/arm64/configs/haydn_defconfig
         
         # 6. 强行往配置文件注入配置项
@@ -70,7 +70,7 @@ jobs:
         export ARCH=arm64
         export SUBARCH=arm64
         
-        # 【终极核心修复】不用 yes 轰炸！先生成基础配置，再用 olddefconfig 自动静默同意所有新选项，彻底绝杀 Broken pipe！
+        # 【终极核心修复】不用惹祸的 yes，先加载基础配置，再用 olddefconfig 静默同意所有新选项！
         make haydn_defconfig
         make olddefconfig
         
@@ -96,10 +96,10 @@ jobs:
         # 使用绝对路径强行适配 K40Pro 的代号 haydn
         sed -i 's/device.name1=.*/device.name1=haydn/g' $GITHUB_WORKSPACE/AnyKernel3/anykernel.sh
         
-        # 将生成的 Image 镜像精准拷贝到打包目录中
+        # 使用绝对路径精准拷贝内核镜像产物
         cp $GITHUB_WORKSPACE/kernel/arch/arm64/boot/Image* $GITHUB_WORKSPACE/AnyKernel3/
         
-        # 同级目录安全打包
+        # 在 AnyKernel3 目录内生成压缩包
         cd $GITHUB_WORKSPACE/AnyKernel3
         zip -r9 SukiSU-Kernel-K40P.zip ./*
 
