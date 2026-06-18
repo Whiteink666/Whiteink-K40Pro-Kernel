@@ -36,23 +36,22 @@ jobs:
         git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git drivers/kernelsu
         echo "obj-y += kernelsu/" >> drivers/Makefile
         
-        # 2. 自动寻找红米 K40 Pro (haydn) 的配置文件并改名
-        DEFCONFIG_FILE=$(find arch/arm64/configs/ -name "*haydn*" | head -n 1)
-        if [ -z "$DEFCONFIG_FILE" ]; then
-          DEFCONFIG_FILE=$(find vendor/ -name "*haydn*" | head -n 1)
+        # 2. 自动寻找红米 K40 Pro (haydn) 的配置文件
+        # 【核心修复】管它在哪，统统复制到主配置目录，并强行命名为 haydn_defconfig
+        REAL_DEFCONFIG=$(find arch/arm64/configs/ -name "*haydn*" | head -n 1)
+        if [ -z "$REAL_DEFCONFIG" ]; then
+          REAL_DEFCONFIG=$(find vendor/ -name "*haydn*" | head -n 1)
         fi
         
-        echo "找到的配置文件路径是: $DEFCONFIG_FILE"
+        echo "原生图纸在: $REAL_DEFCONFIG"
+        cp $REAL_DEFCONFIG arch/arm64/configs/haydn_defconfig
         
-        # 【重点】你专属的霸气内核名字
-        sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-SUkiSU-Ultra-K40Pro-By-🐾白墨🐾Whiteink🐾"/g' $DEFCONFIG_FILE
+        # 【重点】这里已经换上了你专属的霸气内核名字！
+        sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-SUkiSU-Ultra-K40Pro-By-🐾白墨🐾Whiteink🐾"/g' arch/arm64/configs/haydn_defconfig
         
         # 3. 注入 SukiSU 必须的内核配置项
-        echo "CONFIG_KALLSYMS=y" >> $DEFCONFIG_FILE
-        echo "CONFIG_KALLSYMS_ALL=y" >> $DEFCONFIG_FILE
-        
-        # 把找到的文件名存起来给下一步用
-        echo "DEFCONFIG_NAME=$(basename $DEFCONFIG_FILE)" >> $GITHUB_ENV
+        echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/haydn_defconfig
+        echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/haydn_defconfig
 
     - name: Start Compilation
       run: |
@@ -63,10 +62,10 @@ jobs:
         export ARCH=arm64
         export SUBARCH=arm64
         
-        # 预配置内核
-        make O=out $DEFCONFIG_NAME
+        # 【核心修复】现在这里可以直接雷打不动地读取我们准备好的主配置
+        make O=out haydn_defconfig
         
-        # 现代化 LLVM 终极编译命令，全面规避老旧 GNU 链接器错误
+        # 现代化 LLVM 终极编译
         make -j$(nproc --all) O=out \
           CC=clang \
           CLANG_TRIPLE=aarch64-linux-gnu- \
