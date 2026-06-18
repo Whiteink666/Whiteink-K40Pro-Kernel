@@ -30,42 +30,49 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/kernel
         
-        # 1. 直接原地克隆到源码目录中
+        # 1. 物理移除高通惹祸的网络硬件加速模块源码，彻底杜绝 rmnet 报错
+        rm -rf techpack/datarmnet
+        rm -rf techpack/datarmnet-ext
+        
+        # 2. 彻底清理旧目录，纯净注入 SukiSU-Ultra
         rm -rf drivers/kernelsu
         git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git drivers/kernelsu
         
-        # 原地改写 Makefile
+        # 强行原地改写底层编译树
         sed -i '/kernelsu/d' drivers/Makefile
         echo "obj-y += kernelsu/" >> drivers/Makefile
         
-        # 2. 找到配置文件并原地覆盖到标准的 arch 路径下
+        # 3. 自动寻找红米 K40 Pro (haydn) 的配置文件并复制到正门口
         REAL_DEFCONFIG=$(find arch/arm64/configs/ -name "*haydn*" | head -n 1)
         if [ -z "$REAL_DEFCONFIG" ]; then
           REAL_DEFCONFIG=$(find vendor/ -name "*haydn*" | head -n 1)
         fi
         cp $REAL_DEFCONFIG arch/arm64/configs/haydn_defconfig
         
-        # 【名字修改】
+        # 【重点】你专属的霸气内核名字！
         sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-SUkiSU-Ultra-K40Pro-By-🐾白墨🐾Whiteink🐾"/g' arch/arm64/configs/haydn_defconfig
         
-        # 3. 注入配置与排毒
+        # 4. 强行往配置文件注入配置项
         echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/haydn_defconfig
         echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/haydn_defconfig
-        echo "CONFIG_RMNET_SHS=n" >> arch/arm64/configs/haydn_defconfig
-        echo "CONFIG_DATARMNET_EXT=n" >> arch/arm64/configs/haydn_defconfig
 
     - name: Start Compilation
       run: |
         cd $GITHUB_WORKSPACE/kernel
         
-        # 环境变量导入
+        # 导入编译器路径与架构环境变量
         export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
         export ARCH=arm64
         export SUBARCH=arm64
         
-        # 【史诗级修改】彻底去掉 O=out，让它在同一个坑里生根发芽！
+        # 【全线清洗】开始前彻底大扫除，清理所有历史编译残留
+        make clean
+        make mrproper
+        
+        # 重新生成你的专属配置
         make haydn_defconfig
         
+        # 现代化 LLVM 原地混编
         make -j$(nproc --all) \
           CC=clang \
           CLANG_TRIPLE=aarch64-linux-gnu- \
@@ -84,7 +91,7 @@ jobs:
         git clone https://github.com/osm0sis/AnyKernel3.git AnyKernel3
         sed -i 's/device.name1=.*/device.name1=haydn/g' AnyKernel3/anykernel.sh
         
-        # 原地编译的文件直接在原产地拷贝
+        # 从编译好的核心产地拷贝镜像
         cp kernel/arch/arm64/boot/Image AnyKernel3/
         cd AnyKernel3
         zip -r9 ../SukiSU-Kernel-K40P.zip *
