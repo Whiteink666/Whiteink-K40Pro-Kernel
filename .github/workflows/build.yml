@@ -30,19 +30,19 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/kernel
         
-        # 1. 强力物理移除高通网络老伤，保证绝对不探头报错
+        # 1. 物理移除高通惹祸的网络硬件加速模块源码，彻底杜绝 rmnet 报错
         rm -rf techpack/datarmnet
         rm -rf techpack/datarmnet-ext
         
-        # 2. 强力物理挂载 SukiSU-Ultra
+        # 2. 纯净注入 SukiSU-Ultra
         rm -rf drivers/kernelsu
         git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git drivers/kernelsu
         
-        # 确保改写底层编译树且不残留
+        # 原地改写底层编译树
         sed -i '/kernelsu/d' drivers/Makefile
         echo "obj-y += kernelsu/" >> drivers/Makefile
         
-        # 3. 强制覆盖生成绝对纯净的单层级 haydn_defconfig
+        # 3. 自动寻找红米 K40 Pro (haydn) 的配置文件并复制到正门口
         REAL_DEFCONFIG=$(find arch/arm64/configs/ -name "*haydn*" | head -n 1)
         if [ -z "$REAL_DEFCONFIG" ]; then
           REAL_DEFCONFIG=$(find vendor/ -name "*haydn*" | head -n 1)
@@ -52,7 +52,7 @@ jobs:
         # 【重点】你专属的霸气内核名字！
         sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-SUkiSU-Ultra-K40Pro-By-🐾白墨🐾Whiteink🐾"/g' arch/arm64/configs/haydn_defconfig
         
-        # 4. 强行把 SukiSU 依赖的 KALLSYMS 参数塞到最末尾
+        # 4. 强行往配置文件注入配置项
         echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/haydn_defconfig
         echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/haydn_defconfig
 
@@ -60,19 +60,16 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/kernel
         
-        # 导入全套编译器环境变量
+        # 导入编译器路径与架构环境变量
         export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
         export ARCH=arm64
         export SUBARCH=arm64
         
-        # 【全线清洗】彻底格式化当前目录的所有杂质，确保100%纯净
-        make clean
-        make mrproper
-        
-        # 【超级大招】使用 yes "" 强行给所有可能卡住的配置询问自动无脑按回车，绝不给它卡死的机率！
+        # 【全线修正】老师用脑袋担保：这次彻底拿掉了 make clean 和 make mrproper！
+        # 使用 yes "" 自动跳过所有冲突和交互询问
         yes "" | make haydn_defconfig
         
-        # 现代化 LLVM 混编大军直接开工，同样用 yes "" 护航后面的配置检查
+        # 现代化 LLVM 原地混编，无视暗雷一路合流
         yes "" | make -j$(nproc --all) \
           CC=clang \
           CLANG_TRIPLE=aarch64-linux-gnu- \
@@ -91,13 +88,13 @@ jobs:
         git clone https://github.com/osm0sis/AnyKernel3.git AnyKernel3
         sed -i 's/device.name1=.*/device.name1=haydn/g' AnyKernel3/anykernel.sh
         
-        # 拷贝原生同目录下编译生成的产物镜像
+        # 从编译好的核心产地拷贝镜像
         cp kernel/arch/arm64/boot/Image AnyKernel3/
         cd AnyKernel3
         zip -r9 ../SukiSU-Kernel-K40P.zip *
 
     - name: Upload Kernel Zip
-      uses: actions/upload-artifact@v4
+      uses: actions/artifacts/upload-artifact@v4
       with:
         name: SukiSU-Ultra-Kernel-RedmiK40Pro
         path: SukiSU-Kernel-K40P.zip
