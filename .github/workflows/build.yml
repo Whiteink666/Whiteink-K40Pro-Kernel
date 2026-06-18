@@ -29,14 +29,24 @@ jobs:
 
     - name: Integrate SukiSU-Ultra & Customize Name
       run: |
-        # 1. 在独立临时目录下载 SukiSU-Ultra，避开 Git 嵌套死穴
+        # 1. 在独立临时目录下载 SukiSU-Ultra
         cd $GITHUB_WORKSPACE/tmp
         git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git kernelsu_source
         
-        # 2. 先完整复制保留源码完整性，再精准擦除 Git 套娃指纹痕迹
+        # 2. 【核心修复】精准提取。如果子目录有 kernel 驱动，直接把带有 Makefile 的那层给捞出来
         cd $GITHUB_WORKSPACE/kernel
         rm -rf drivers/kernelsu
-        cp -r $GITHUB_WORKSPACE/tmp/kernelsu_source drivers/kernelsu
+        
+        # 自动探测并确保将真正含有 Makefile 的那一层纯代码移入 drivers/kernelsu
+        if [ -d "$GITHUB_WORKSPACE/tmp/kernelsu_source/kernel" ]; then
+          mv $GITHUB_WORKSPACE/tmp/kernelsu_source/kernel drivers/kernelsu
+        elif [ -d "$GITHUB_WORKSPACE/tmp/kernelsu_source/ksu" ]; then
+          mv $GITHUB_WORKSPACE/tmp/kernelsu_source/ksu drivers/kernelsu
+        else
+          mv $GITHUB_WORKSPACE/tmp/kernelsu_source drivers/kernelsu
+        fi
+        
+        # 彻底移除指纹残留
         rm -rf drivers/kernelsu/.git
         
         # 3. 物理移除高通惹祸的网络硬件加速模块源码，彻底杜绝 rmnet 报错
@@ -54,7 +64,7 @@ jobs:
         fi
         cp $REAL_DEFCONFIG arch/arm64/configs/haydn_defconfig
         
-        # 【配置纯净化修改】使用最标准、绝对不触发语法截断的内核后缀名
+        # 【名字纯净化修改】使用最标准、绝对不触发语法截断的内核后缀名
         sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-SukiSU-Ultra"/g' arch/arm64/configs/haydn_defconfig
         
         # 6. 强行往配置文件注入配置项
@@ -70,7 +80,7 @@ jobs:
         export ARCH=arm64
         export SUBARCH=arm64
         
-        # 【终极核心修复】不用惹祸的 yes，先加载基础配置，再用 olddefconfig 静默同意所有新选项！
+        # 纯净非交互图纸对齐，这步你的日志证明已经稳过了！
         make haydn_defconfig
         make olddefconfig
         
