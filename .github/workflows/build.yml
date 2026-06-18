@@ -30,15 +30,20 @@ jobs:
 
     - name: Integrate SukiSU-Ultra & Customize Name
       run: |
+        # 使用绝对路径，确保万无一失
         cd $GITHUB_WORKSPACE/kernel
         
-        # 1. 克隆 SukiSU-Ultra 源码到指定目录
+        # 1. 强行删除可能残留的旧目录，彻底重新克隆
+        rm -rf drivers/kernelsu
         git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git drivers/kernelsu
         
-        # 使用更稳固的路径写入，防止 out 目录找不到规则
-        if ! grep -q "obj-y += kernelsu/" drivers/Makefile; then
-          echo "obj-y += kernelsu/" >> drivers/Makefile
-        fi
+        # 建立双重软链接保险，让 out 目录和主目录都能无缝读取
+        mkdir -p out/drivers
+        ln -sf $GITHUB_WORKSPACE/kernel/drivers/kernelsu out/drivers/kernelsu
+        
+        # 确保 Makefile 写入正确
+        sed -i '/kernelsu/d' drivers/Makefile
+        echo "obj-y += kernelsu/" >> drivers/Makefile
         
         # 2. 自动寻找红米 K40 Pro (haydn) 的配置文件并复制到正门口
         REAL_DEFCONFIG=$(find arch/arm64/configs/ -name "*haydn*" | head -n 1)
@@ -56,7 +61,7 @@ jobs:
         echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/haydn_defconfig
         echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/haydn_defconfig
         
-        # 【大招：关闭高通惹祸的网络报错模块】
+        # 【大招：全面关闭高通网络报错模块】
         echo "CONFIG_RMNET_SHS=n" >> arch/arm64/configs/haydn_defconfig
         echo "CONFIG_DATARMNET_EXT=n" >> arch/arm64/configs/haydn_defconfig
 
