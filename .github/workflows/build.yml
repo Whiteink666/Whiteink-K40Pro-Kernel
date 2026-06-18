@@ -60,7 +60,7 @@ jobs:
         fi
         cp $REAL_DEFCONFIG arch/arm64/configs/haydn_defconfig
         
-        # 【名字修改】
+        # 【名字修改】使用最安全稳定的纯净英文后缀
         sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-SukiSU-Ultra"/g' arch/arm64/configs/haydn_defconfig
         
         # 6. 强行往配置文件注入配置项
@@ -95,9 +95,14 @@ jobs:
         rm -rf AnyKernel3
         git clone https://github.com/osm0sis/AnyKernel3.git AnyKernel3
         
-        # 【核心修复】强行改写 AnyKernel3 的分区匹配逻辑，让它通过 by-name 自动寻找 boot 分区
-        sed -i 's/block=.*/block=\/dev\/block\/by-name\/boot;/g' $GITHUB_WORKSPACE/AnyKernel3/anykernel.sh
-        sed -i 's/is_slot_device=.*/is_slot_device=1;/g' $GITHUB_WORKSPACE/AnyKernel3/anykernel.sh # K40P 是 A/B 分区设备，必须开启此项
+        # 【真正的绝杀修复：精准抹除顽固老路径，强行注入现代 by-name 匹配】
+        # 1. 彻底干掉原文件里所有尝试写死 block=... 的逻辑，直接用我们的现代路径覆盖
+        sed -i 's|^block=.*|block=/dev/block/by-name/boot;|g' $GITHUB_WORKSPACE/AnyKernel3/anykernel.sh
+        
+        # 2. 强行开启 A/B 槽位支持，适配 K40P 的现代分区机制
+        sed -i 's/is_slot_device=.*/is_slot_device=1;/g' $GITHUB_WORKSPACE/AnyKernel3/anykernel.sh
+        
+        # 3. 强行把默认的通用设备名修改为 K40P 的专属代号 haydn
         sed -i 's/device.name1=.*/device.name1=haydn/g' $GITHUB_WORKSPACE/AnyKernel3/anykernel.sh
         
         # 将生成的 Image 镜像精准拷贝到打包目录中
