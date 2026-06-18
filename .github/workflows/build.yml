@@ -1,7 +1,7 @@
 name: Build Redmi K40 Pro SukiSU Kernel
 
 on:
-  workflow_dispatch: # 允许你手动点击按钮开始编译
+  workflow_dispatch:
 
 jobs:
   build:
@@ -19,49 +19,38 @@ jobs:
     - name: Download Reliable Lightweight Clang
       run: |
         cd $GITHUB_WORKSPACE
-        # 使用经圈内验证、完全公开、绝不锁密码的轻量级 AOSP Clang 12.0.5 存储库
         git clone https://github.com/Panchajanya1999/azure-clang.git --depth=1 clang
 
     - name: Download Kernel Source
       run: |
         cd $GITHUB_WORKSPACE/kernel
-        # 拉取经过社区修复、支持较新安卓版本的 K40Pro 骁龙888内核源码
         git clone https://github.com/LineageOS/android_kernel_xiaomi_sm8350.git -b lineage-21 --depth=1 .
 
     - name: Integrate SukiSU-Ultra & Customize Name
       run: |
-        # 使用绝对路径，确保万无一失
         cd $GITHUB_WORKSPACE/kernel
         
-        # 1. 强行删除可能残留的旧目录，彻底重新克隆
+        # 1. 直接原地克隆到源码目录中
         rm -rf drivers/kernelsu
         git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git drivers/kernelsu
         
-        # 建立双重软链接保险，让 out 目录和主目录都能无缝读取
-        mkdir -p out/drivers
-        ln -sf $GITHUB_WORKSPACE/kernel/drivers/kernelsu out/drivers/kernelsu
-        
-        # 确保 Makefile 写入正确
+        # 原地改写 Makefile
         sed -i '/kernelsu/d' drivers/Makefile
         echo "obj-y += kernelsu/" >> drivers/Makefile
         
-        # 2. 自动寻找红米 K40 Pro (haydn) 的配置文件并复制到正门口
+        # 2. 找到配置文件并原地覆盖到标准的 arch 路径下
         REAL_DEFCONFIG=$(find arch/arm64/configs/ -name "*haydn*" | head -n 1)
         if [ -z "$REAL_DEFCONFIG" ]; then
           REAL_DEFCONFIG=$(find vendor/ -name "*haydn*" | head -n 1)
         fi
-        
-        echo "原生图纸在: $REAL_DEFCONFIG"
         cp $REAL_DEFCONFIG arch/arm64/configs/haydn_defconfig
         
-        # 【重点】你专属的霸气内核名字！
+        # 【名字修改】
         sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-SUkiSU-Ultra-K40Pro-By-🐾白墨🐾Whiteink🐾"/g' arch/arm64/configs/haydn_defconfig
         
-        # 3. 注入 SukiSU 必须的内核配置项
+        # 3. 注入配置与排毒
         echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/haydn_defconfig
         echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/haydn_defconfig
-        
-        # 【大招：全面关闭高通网络报错模块】
         echo "CONFIG_RMNET_SHS=n" >> arch/arm64/configs/haydn_defconfig
         echo "CONFIG_DATARMNET_EXT=n" >> arch/arm64/configs/haydn_defconfig
 
@@ -69,16 +58,15 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/kernel
         
-        # 设置绝对纯净的路径变量
+        # 环境变量导入
         export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
         export ARCH=arm64
         export SUBARCH=arm64
         
-        # 预配置内核
-        make O=out haydn_defconfig
+        # 【史诗级修改】彻底去掉 O=out，让它在同一个坑里生根发芽！
+        make haydn_defconfig
         
-        # 现代化 LLVM 终极编译
-        make -j$(nproc --all) O=out \
+        make -j$(nproc --all) \
           CC=clang \
           CLANG_TRIPLE=aarch64-linux-gnu- \
           CROSS_COMPILE=aarch64-linux-gnu- \
@@ -94,10 +82,10 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE
         git clone https://github.com/osm0sis/AnyKernel3.git AnyKernel3
-        # 适配 K40Pro 的代号 haydn
         sed -i 's/device.name1=.*/device.name1=haydn/g' AnyKernel3/anykernel.sh
-        # 把编译好的 Image 复制并重命名放到打包目录中
-        cp kernel/out/arch/arm64/boot/Image AnyKernel3/
+        
+        # 原地编译的文件直接在原产地拷贝
+        cp kernel/arch/arm64/boot/Image AnyKernel3/
         cd AnyKernel3
         zip -r9 ../SukiSU-Kernel-K40P.zip *
 
