@@ -1,0 +1,76 @@
+name: Build Redmi K40 Pro SukiSU Kernel
+
+on:
+  workflow_dispatch: # 允许你手动点击按钮开始编译
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set up Build Environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bc build-essential libelf-dev libssl-dev flex bison bioy ccache libncurses-dev textinfo imagex-utils zip
+        mkdir -p $GITHUB_WORKSPACE/kernel
+
+    - name: Download Toolchain (Clang)
+      run: |
+        cd $GITHUB_WORKSPACE
+        # 下载官方推荐的 Proton Clang 编译器
+        git clone https://github.com/kdrag0n/proton-clang.git --depth=1 clang
+
+    - name: Download Kernel Source
+      run: |
+        cd $GITHUB_WORKSPACE/kernel
+        # 拉取经过社区修复、支持较新安卓版本的 K40Pro 骁龙888内核源码
+        git clone https://github.com/LineageOS/android_kernel_xiaomi_sm8350.git -b lineage-21 --depth=1 .
+
+    - name: Integrate SukiSU-Ultra & Customize Name
+      run: |
+        cd $GITHUB_WORKSPACE/kernel
+        
+        # 1. 注入 SukiSU-Ultra 源码
+        git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git drivers/kernelsu
+        echo "obj-y += kernelsu/" >> drivers/Makefile
+        
+        # 2. 【重点】自定义你的内核名字！
+        # 老师在这里帮你把内核的本地版本号后缀改掉。
+        # 你可以把下面的 "-Suki-Ultra-MyK40Pro" 改成任何你想叫的英文名字（不要有空格）
+        sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-Suki-Ultra-MyK40Pro"/g' arch/arm64/configs/haydn_user_defconfig
+        
+        # 3. 开启 SukiSU 必须的内核配置项
+        echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/haydn_user_defconfig
+        echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/haydn_user_defconfig
+
+    - name: Start Compilation
+      run: |
+        cd $GITHUB_WORKSPACE/kernel
+        export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
+        export ARCH=arm64
+        export SUBARCH=arm64
+        export CROSS_COMPILE=aarch64-linux-gnu-
+        export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+        
+        # 开始编译
+        make O=out haydn_user_defconfig
+        make -j$(nproc --all) O=out CC=clang
+
+    - name: Pack with AnyKernel3
+      run: |
+        cd $GITHUB_WORKSPACE
+        git clone https://github.com/osm0sis/AnyKernel3.git AnyKernel3
+        # 适配 K40Pro 的代号
+        sed -i 's/device.name1=.*/device.name1=haydn/g' AnyKernel3/anykernel.sh
+        # 把编译好的内核文件放进打包目录
+        cp kernel/out/arch/arm64/boot/Image AnyKernel3/
+        cd AnyKernel3
+        zip -r9 ../SukiSU-Kernel-K40P.zip *
+
+    - name: Upload Kernel Zip
+      uses: actions/artifacts/upload-artifact@v4
+      with:
+        name: SukiSU-Ultra-Kernel-RedmiK40Pro
+        path: SukiSU-Kernel-K40P.zip
