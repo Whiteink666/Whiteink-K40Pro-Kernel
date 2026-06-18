@@ -63,14 +63,11 @@ jobs:
         export CROSS_COMPILE=aarch64-linux-gnu-
         export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
         
-        # 【核心修复】强制指定主机编译时使用系统自带的链接器，绕过老 Clang 链接器不兼容新系统的问题
-        export HOSTCFLAGS="-fucontext"
-        
-        # 开始预配置
+        # 预配置内核
         make O=out $DEFCONFIG_NAME
         
-        # 开始编译：加上 LD=ld.lld 和 HOSTLD=ld，彻底解决新旧系统库文件冲突
-        make -j$(nproc --all) O=out CC=clang LD=ld.lld HOSTLD=ld
+        # 终极编译命令：采用标准的安卓内核多线程交叉编译参数，彻底绝杀链接器冲突
+        make -j$(nproc --all) O=out CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi-
 
     - name: Pack with AnyKernel3
       run: |
