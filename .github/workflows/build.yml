@@ -32,12 +32,15 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/kernel
         
-        # 1. 注入 SukiSU-Ultra 源码
+        # 1. 克隆 SukiSU-Ultra 源码到指定目录
         git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git drivers/kernelsu
-        echo "obj-y += kernelsu/" >> drivers/Makefile
         
-        # 2. 自动寻找红米 K40 Pro (haydn) 的配置文件
-        # 【核心修复】管它在哪，统统复制到主配置目录，并强行命名为 haydn_defconfig
+        # 使用更稳固的路径写入，防止 out 目录找不到规则
+        if ! grep -q "obj-y += kernelsu/" drivers/Makefile; then
+          echo "obj-y += kernelsu/" >> drivers/Makefile
+        fi
+        
+        # 2. 自动寻找红米 K40 Pro (haydn) 的配置文件并复制到正门口
         REAL_DEFCONFIG=$(find arch/arm64/configs/ -name "*haydn*" | head -n 1)
         if [ -z "$REAL_DEFCONFIG" ]; then
           REAL_DEFCONFIG=$(find vendor/ -name "*haydn*" | head -n 1)
@@ -46,12 +49,16 @@ jobs:
         echo "原生图纸在: $REAL_DEFCONFIG"
         cp $REAL_DEFCONFIG arch/arm64/configs/haydn_defconfig
         
-        # 【重点】这里已经换上了你专属的霸气内核名字！
+        # 【重点】你专属的霸气内核名字！
         sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-SUkiSU-Ultra-K40Pro-By-🐾白墨🐾Whiteink🐾"/g' arch/arm64/configs/haydn_defconfig
         
         # 3. 注入 SukiSU 必须的内核配置项
         echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/haydn_defconfig
         echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/haydn_defconfig
+        
+        # 【大招：关闭高通惹祸的网络报错模块】
+        echo "CONFIG_RMNET_SHS=n" >> arch/arm64/configs/haydn_defconfig
+        echo "CONFIG_DATARMNET_EXT=n" >> arch/arm64/configs/haydn_defconfig
 
     - name: Start Compilation
       run: |
@@ -62,7 +69,7 @@ jobs:
         export ARCH=arm64
         export SUBARCH=arm64
         
-        # 【核心修复】现在这里可以直接雷打不动地读取我们准备好的主配置
+        # 预配置内核
         make O=out haydn_defconfig
         
         # 现代化 LLVM 终极编译
