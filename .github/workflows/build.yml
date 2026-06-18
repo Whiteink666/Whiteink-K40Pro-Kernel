@@ -38,7 +38,7 @@ jobs:
         rm -rf drivers/kernelsu
         git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git drivers/kernelsu
         
-        # 强行原地改写底层编译树
+        # 原地改写底层编译树
         sed -i '/kernelsu/d' drivers/Makefile
         echo "obj-y += kernelsu/" >> drivers/Makefile
         
@@ -65,11 +65,7 @@ jobs:
         export ARCH=arm64
         export SUBARCH=arm64
         
-        # 【全线清洗】开始前彻底大扫除，清理所有历史编译残留
-        make clean
-        make mrproper
-        
-        # 重新生成你的专属配置
+        # 【核心修正】彻底拿掉报错的 clean 命令，直接生成图纸开工！
         make haydn_defconfig
         
         # 现代化 LLVM 原地混编
