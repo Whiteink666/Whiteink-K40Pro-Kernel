@@ -16,11 +16,11 @@ jobs:
         sudo apt-get install -y bc build-essential libelf-dev libssl-dev flex bison ccache libncurses-dev texinfo zip lld llvm
         mkdir -p $GITHUB_WORKSPACE/kernel
 
-    - name: Download Google Official Clang (From Github Mirror)
+    - name: Download Google Official Clang (From Reliable Mirror)
       run: |
         cd $GITHUB_WORKSPACE
-        # 换用社区维护的 AOSP Clang 镜像仓库，速度极快且极其稳定，版本号对应 r450784d
-        git clone https://github.com/Ygjsz/google-clang.git --depth=1 -b clang-r450784d clang
+        # 换用官方 Android Open Source Project 在 GitHub 上的标准公开存储库组件，绝对不需要密码
+        git clone https://github.com/aosp-mirror/platform_prebuilts_clang_host_linux-x86.git --depth=1 -b pie-gsi clang
         
         # 下载官方交叉编译器组件 (GCC/Binutils)
         git clone https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 --depth=1 -b master gcc64
