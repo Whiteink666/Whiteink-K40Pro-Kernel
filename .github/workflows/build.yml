@@ -1,4 +1,4 @@
-name: Super Pure Build K40P SukiSU Kernel
+name: Build Redmi K40 Pro SukiSU Kernel
 
 on:
   workflow_dispatch:
@@ -30,29 +30,29 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/kernel
         
-        # 1. 物理移除高通惹祸的网络源码
+        # 1. 强力物理移除高通网络老伤，保证绝对不探头报错
         rm -rf techpack/datarmnet
         rm -rf techpack/datarmnet-ext
         
-        # 2. 注入 SukiSU-Ultra
+        # 2. 强力物理挂载 SukiSU-Ultra
         rm -rf drivers/kernelsu
         git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git drivers/kernelsu
         
-        # 原地改写底层编译树
+        # 确保改写底层编译树且不残留
         sed -i '/kernelsu/d' drivers/Makefile
         echo "obj-y += kernelsu/" >> drivers/Makefile
         
-        # 3. 复制配置文件到正门口
+        # 3. 强制覆盖生成绝对纯净的单层级 haydn_defconfig
         REAL_DEFCONFIG=$(find arch/arm64/configs/ -name "*haydn*" | head -n 1)
         if [ -z "$REAL_DEFCONFIG" ]; then
           REAL_DEFCONFIG=$(find vendor/ -name "*haydn*" | head -n 1)
         fi
         cp $REAL_DEFCONFIG arch/arm64/configs/haydn_defconfig
         
-        # 【名字修改】注入你尊贵的专属名字！
+        # 【重点】你专属的霸气内核名字！
         sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-SUkiSU-Ultra-K40Pro-By-🐾白墨🐾Whiteink🐾"/g' arch/arm64/configs/haydn_defconfig
         
-        # 4. 强行注入配置项
+        # 4. 强行把 SukiSU 依赖的 KALLSYMS 参数塞到最末尾
         echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/haydn_defconfig
         echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/haydn_defconfig
 
@@ -60,16 +60,20 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/kernel
         
-        # 导入编译器路径与架构环境变量
+        # 导入全套编译器环境变量
         export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
         export ARCH=arm64
         export SUBARCH=arm64
         
-        # 【核心修正】强制不读取任何旧图纸，全自动跳过所有询问弹窗
-        make haydn_defconfig
+        # 【全线清洗】彻底格式化当前目录的所有杂质，确保100%纯净
+        make clean
+        make mrproper
         
-        # 现代化 LLVM 原地混编 (加入 ARCH=arm64 强制静默编译)
-        make -j$(nproc --all) ARCH=arm64 \
+        # 【超级大招】使用 yes "" 强行给所有可能卡住的配置询问自动无脑按回车，绝不给它卡死的机率！
+        yes "" | make haydn_defconfig
+        
+        # 现代化 LLVM 混编大军直接开工，同样用 yes "" 护航后面的配置检查
+        yes "" | make -j$(nproc --all) \
           CC=clang \
           CLANG_TRIPLE=aarch64-linux-gnu- \
           CROSS_COMPILE=aarch64-linux-gnu- \
@@ -87,7 +91,7 @@ jobs:
         git clone https://github.com/osm0sis/AnyKernel3.git AnyKernel3
         sed -i 's/device.name1=.*/device.name1=haydn/g' AnyKernel3/anykernel.sh
         
-        # 从编译好的核心产地拷贝镜像
+        # 拷贝原生同目录下编译生成的产物镜像
         cp kernel/arch/arm64/boot/Image AnyKernel3/
         cd AnyKernel3
         zip -r9 ../SukiSU-Kernel-K40P.zip *
