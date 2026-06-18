@@ -16,15 +16,11 @@ jobs:
         sudo apt-get install -y bc build-essential libelf-dev libssl-dev flex bison ccache libncurses-dev texinfo zip lld llvm
         mkdir -p $GITHUB_WORKSPACE/kernel
 
-    - name: Download Google Official Clang (From Reliable Mirror)
+    - name: Download Reliable Lightweight Clang
       run: |
         cd $GITHUB_WORKSPACE
-        # 换用官方 Android Open Source Project 在 GitHub 上的标准公开存储库组件，绝对不需要密码
-        git clone https://github.com/aosp-mirror/platform_prebuilts_clang_host_linux-x86.git --depth=1 -b pie-gsi clang
-        
-        # 下载官方交叉编译器组件 (GCC/Binutils)
-        git clone https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 --depth=1 -b master gcc64
-        git clone https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9 --depth=1 -b master gcc32
+        # 使用经圈内验证、完全公开、绝不锁密码的轻量级 AOSP Clang 12.0.5 存储库
+        git clone https://github.com/Panchajanya1999/azure-clang.git --depth=1 clang
 
     - name: Download Kernel Source
       run: |
@@ -62,20 +58,20 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/kernel
         
-        # 设置路径和交叉编译环境变量
-        export PATH="$GITHUB_WORKSPACE/clang/bin:$GITHUB_WORKSPACE/gcc64/bin:$GITHUB_WORKSPACE/gcc32/bin:$PATH"
+        # 设置绝对纯净的路径变量
+        export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
         export ARCH=arm64
         export SUBARCH=arm64
         
         # 预配置内核
         make O=out $DEFCONFIG_NAME
         
-        # 官方内核编译命令组合
+        # 现代化 LLVM 终极编译命令，全面规避老旧 GNU 链接器错误
         make -j$(nproc --all) O=out \
           CC=clang \
           CLANG_TRIPLE=aarch64-linux-gnu- \
-          CROSS_COMPILE=aarch64-linux-android- \
-          CROSS_COMPILE_ARM32=arm-linux-androideabi- \
+          CROSS_COMPILE=aarch64-linux-gnu- \
+          CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
           LD=ld.lld \
           AR=llvm-ar \
           NM=llvm-nm \
