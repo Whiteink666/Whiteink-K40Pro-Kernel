@@ -33,11 +33,9 @@ jobs:
         cd $GITHUB_WORKSPACE/tmp
         git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git kernelsu_source
         
-        # 2. 【核心修复】精准提取。如果子目录有 kernel 驱动，直接把带有 Makefile 的那层给捞出来
+        # 2. 精准提取驱动核心
         cd $GITHUB_WORKSPACE/kernel
         rm -rf drivers/kernelsu
-        
-        # 自动探测并确保将真正含有 Makefile 的那一层纯代码移入 drivers/kernelsu
         if [ -d "$GITHUB_WORKSPACE/tmp/kernelsu_source/kernel" ]; then
           mv $GITHUB_WORKSPACE/tmp/kernelsu_source/kernel drivers/kernelsu
         elif [ -d "$GITHUB_WORKSPACE/tmp/kernelsu_source/ksu" ]; then
@@ -45,11 +43,9 @@ jobs:
         else
           mv $GITHUB_WORKSPACE/tmp/kernelsu_source drivers/kernelsu
         fi
-        
-        # 彻底移除指纹残留
         rm -rf drivers/kernelsu/.git
         
-        # 3. 物理移除高通惹祸的网络硬件加速模块源码，彻底杜绝 rmnet 报错
+        # 3. 物理移除高通惹祸的网络硬件加速模块源码
         rm -rf techpack/datarmnet
         rm -rf techpack/datarmnet-ext
         
@@ -64,7 +60,7 @@ jobs:
         fi
         cp $REAL_DEFCONFIG arch/arm64/configs/haydn_defconfig
         
-        # 【名字纯净化修改】使用最标准、绝对不触发语法截断的内核后缀名
+        # 【名字修改】
         sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-SukiSU-Ultra"/g' arch/arm64/configs/haydn_defconfig
         
         # 6. 强行往配置文件注入配置项
@@ -74,17 +70,13 @@ jobs:
     - name: Start Compilation
       run: |
         cd $GITHUB_WORKSPACE/kernel
-        
-        # 导入编译器路径与架构环境变量
         export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
         export ARCH=arm64
         export SUBARCH=arm64
         
-        # 纯净非交互图纸对齐，这步你的日志证明已经稳过了！
         make haydn_defconfig
         make olddefconfig
         
-        # 现代化 LLVM 原地混编，无缝合流
         make -j$(nproc --all) \
           CC=clang \
           CLANG_TRIPLE=aarch64-linux-gnu- \
@@ -103,10 +95,12 @@ jobs:
         rm -rf AnyKernel3
         git clone https://github.com/osm0sis/AnyKernel3.git AnyKernel3
         
-        # 使用绝对路径强行适配 K40Pro 的代号 haydn
+        # 【核心修复】强行改写 AnyKernel3 的分区匹配逻辑，让它通过 by-name 自动寻找 boot 分区
+        sed -i 's/block=.*/block=\/dev\/block\/by-name\/boot;/g' $GITHUB_WORKSPACE/AnyKernel3/anykernel.sh
+        sed -i 's/is_slot_device=.*/is_slot_device=1;/g' $GITHUB_WORKSPACE/AnyKernel3/anykernel.sh # K40P 是 A/B 分区设备，必须开启此项
         sed -i 's/device.name1=.*/device.name1=haydn/g' $GITHUB_WORKSPACE/AnyKernel3/anykernel.sh
         
-        # 使用绝对路径精准拷贝内核镜像产物
+        # 将生成的 Image 镜像精准拷贝到打包目录中
         cp $GITHUB_WORKSPACE/kernel/arch/arm64/boot/Image* $GITHUB_WORKSPACE/AnyKernel3/
         
         # 在 AnyKernel3 目录内生成压缩包
