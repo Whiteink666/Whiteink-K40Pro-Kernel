@@ -39,7 +39,7 @@ jobs:
         # 2. 【重点】自定义你的内核名字！
         # 老师在这里帮你把内核的本地版本号后缀改掉。
         # 你可以把下面的 "-Suki-Ultra-MyK40Pro" 改成任何你想叫的英文名字（不要有空格）
-        sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-Suki-Ultra-MyK40Pro"/g' arch/arm64/configs/haydn_user_defconfig
+        sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="SUkiSU-Ultra-K40Pro-By-Whiteink"/g' arch/arm64/configs/haydn_user_defconfig
         
         # 3. 开启 SukiSU 必须的内核配置项
         echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/haydn_user_defconfig
