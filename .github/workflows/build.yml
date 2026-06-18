@@ -15,6 +15,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y bc build-essential libelf-dev libssl-dev flex bison ccache libncurses-dev texinfo zip lld llvm
         mkdir -p $GITHUB_WORKSPACE/kernel
+        mkdir -p $GITHUB_WORKSPACE/tmp
 
     - name: Download Reliable Lightweight Clang
       run: |
@@ -28,31 +29,35 @@ jobs:
 
     - name: Integrate SukiSU-Ultra & Customize Name
       run: |
-        cd $GITHUB_WORKSPACE/kernel
+        # 1. 在独立临时目录下载 SukiSU-Ultra
+        cd $GITHUB_WORKSPACE/tmp
+        git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git kernelsu_source
         
-        # 1. 物理移除高通惹祸的网络硬件加速模块源码，彻底杜绝 rmnet 报错
+        # 2. 完整复制保留源码完整性，再精准擦除 Git 套娃痕迹
+        cd $GITHUB_WORKSPACE/kernel
+        rm -rf drivers/kernelsu
+        cp -r $GITHUB_WORKSPACE/tmp/kernelsu_source drivers/kernelsu
+        rm -rf drivers/kernelsu/.git
+        
+        # 3. 物理移除高通惹祸的网络硬件加速模块源码，彻底杜绝 rmnet 报错
         rm -rf techpack/datarmnet
         rm -rf techpack/datarmnet-ext
         
-        # 2. 纯净注入 SukiSU-Ultra
-        rm -rf drivers/kernelsu
-        git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git drivers/kernelsu
-        
-        # 原地改写底层编译树
+        # 4. 安全改写底层编译树
         sed -i '/kernelsu/d' drivers/Makefile
         echo "obj-y += kernelsu/" >> drivers/Makefile
         
-        # 3. 自动寻找红米 K40 Pro (haydn) 的配置文件并复制到正门口
+        # 5. 自动寻找红米 K40 Pro (haydn) 的配置文件并复制到正门口
         REAL_DEFCONFIG=$(find arch/arm64/configs/ -name "*haydn*" | head -n 1)
         if [ -z "$REAL_DEFCONFIG" ]; then
           REAL_DEFCONFIG=$(find vendor/ -name "*haydn*" | head -n 1)
         fi
         cp $REAL_DEFCONFIG arch/arm64/configs/haydn_defconfig
         
-        # 【重点】你专属的霸气内核名字！
-        sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-SUkiSU-Ultra-K40Pro-By-🐾白墨🐾Whiteink🐾"/g' arch/arm64/configs/haydn_defconfig
+        # 【配置纯净化修改】使用最标准、绝对不触发语法截断的内核后缀名
+        sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-SukiSU-Ultra"/g' arch/arm64/configs/haydn_defconfig
         
-        # 4. 强行往配置文件注入配置项
+        # 6. 强行往配置文件注入配置项
         echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/haydn_defconfig
         echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/haydn_defconfig
 
@@ -65,11 +70,10 @@ jobs:
         export ARCH=arm64
         export SUBARCH=arm64
         
-        # 【全线修正】老师用脑袋担保：这次彻底拿掉了 make clean 和 make mrproper！
-        # 使用 yes "" 自动跳过所有冲突和交互询问
+        # 强制生成纯净图纸
         yes "" | make haydn_defconfig
         
-        # 现代化 LLVM 原地混编，无视暗雷一路合流
+        # 现代化 LLVM 原地混编，无视所有暗雷
         yes "" | make -j$(nproc --all) \
           CC=clang \
           CLANG_TRIPLE=aarch64-linux-gnu- \
@@ -85,16 +89,22 @@ jobs:
     - name: Pack with AnyKernel3
       run: |
         cd $GITHUB_WORKSPACE
+        # 彻底清理旧打包目录，重新克隆
+        rm -rf AnyKernel3
         git clone https://github.com/osm0sis/AnyKernel3.git AnyKernel3
-        sed -i 's/device.name1=.*/device.name1=haydn/g' AnyKernel3/anykernel.sh
         
-        # 从编译好的核心产地拷贝镜像
-        cp kernel/arch/arm64/boot/Image AnyKernel3/
-        cd AnyKernel3
-        zip -r9 ../SukiSU-Kernel-K40P.zip *
+        # 使用绝对路径精准适配 K40Pro 的代号 haydn
+        sed -i 's/device.name1=.*/device.name1=haydn/g' $GITHUB_WORKSPACE/AnyKernel3/anykernel.sh
+        
+        # 将生成的 Image 镜像精准拷贝到打包目录中
+        cp $GITHUB_WORKSPACE/kernel/arch/arm64/boot/Image* $GITHUB_WORKSPACE/AnyKernel3/
+        
+        # 在 AnyKernel3 目录内生成压缩包，不进行跨目录位移，保证绝对安全
+        cd $GITHUB_WORKSPACE/AnyKernel3
+        zip -r9 SukiSU-Kernel-K40P.zip ./*
 
     - name: Upload Kernel Zip
-      uses: actions/artifacts/upload-artifact@v4
+      uses: actions/upload-artifact@v4
       with:
         name: SukiSU-Ultra-Kernel-RedmiK40Pro
-        path: SukiSU-Kernel-K40P.zip
+        path: AnyKernel3/SukiSU-Kernel-K40P.zip
