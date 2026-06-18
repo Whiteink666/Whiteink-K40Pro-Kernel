@@ -68,9 +68,9 @@ jobs:
         cp kernel/out/arch/arm64/boot/Image AnyKernel3/
         cd AnyKernel3
         zip -r9 ../SukiSU-Kernel-K40P.zip *
-
-    - name: Upload Kernel Zip
-      uses: actions/artifacts/upload-artifact@v4
-      with:
+        
+     - name: Upload Kernel Zip
+       uses: actions/upload-artifact@v4 #  已经修复
+       with:
         name: SukiSU-Ultra-Kernel-RedmiK40Pro
         path: SukiSU-Kernel-K40P.zip
